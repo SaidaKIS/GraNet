@@ -3,11 +3,11 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import model
+import model_GraNet
 import random
 from glob import glob
 from scipy.special import expit
-import Granules_labelling
+#import Granules_labelling
 
 EPS = 1e-10
 
@@ -43,7 +43,6 @@ def overall_pixel_accuracy(hist):
     overall_acc = correct / (total + EPS)
     return overall_acc
 
-
 def per_class_pixel_accuracy(hist):
     """Computes the average per-class pixel accuracy.
     The per-class pixel accuracy is a more fine-grained
@@ -64,7 +63,6 @@ def per_class_pixel_accuracy(hist):
     avg_per_class_acc = nanmean(per_class_acc)
     return avg_per_class_acc
 
-
 def jaccard_index(hist):
     """Computes the Jaccard index, a.k.a the Intersection over Union (IoU).
     Args:
@@ -78,7 +76,6 @@ def jaccard_index(hist):
     jaccard = A_inter_B / (A + B - A_inter_B + EPS)
     avg_jacc = nanmean(jaccard)
     return avg_jacc
-
 
 def dice_coefficient(hist):
     """Computes the Sørensen–Dice coefficient, a.k.a the F1 score.
@@ -94,13 +91,11 @@ def dice_coefficient(hist):
     avg_dice = nanmean(dice)
     return avg_dice
 
-
 def Per_class_OPA(hist):
     correct_per_class = torch.diag(hist)
     total_per_class = hist.sum(dim=1)
     per_class_acc = correct_per_class / (total_per_class + EPS)
     return per_class_acc
-
 
 def Per_class_jaccard(hist):
     A_inter_B = torch.diag(hist)
@@ -115,7 +110,6 @@ def Per_class_dice(hist):
     B = hist.sum(dim=0)
     dice = (2 * A_inter_B) / (A + B + EPS)
     return dice
-
 
 def eval_metrics_sem(true, pred, num_classes, device):
     """Computes various segmentation metrics on 2D feature maps.
@@ -435,64 +429,65 @@ def class_prop(root):
     for v in values:
         print('Class {} - proportion {}'.format(v, counts[int(v)]/mask_smap.size))
 
-def test_Imax(save_file, m, bin_classes, s=512, frame_num=4, save=True):
-    fs = Granules_labelling.IMaX_maps(save_file)
-    size = fs.shape[0]
-    #random_ind = [random.randint(20, size-20) for x in range(frame_num)]
-    random_ind =[24, 69, 75, 95]
-
-    model_unet = model.UNet(n_channels=1, n_classes=5, bilinear=False).to('cpu')
-    model_unet.load_state_dict(m)
-    model_unet.eval()
-    data=[]
-
-    for ind in random_ind:
-        fs.select_map(ind)
-        map_f = fs.smap
-        map_f = map_f/map_f.max()
-        map_f_s = len(map_f) 
-
-        dx=[]
-        if map_f_s > size:
-            x1 = int(abs(map_f_s/2) - (s/2))
-            x2 = int(abs(map_f_s/2) + (s/2))
-            dx.append(map_f[x1:x2,x1:x2])
-        else:
-            raise ValueError('Map size lower that requested - change the requested/input size keyword')
-
-        dx=np.array(dx)
-        partial = torch.unsqueeze(torch.Tensor(dx),1)
-        x=torch.unsqueeze(partial[:,0,:,:],1)
-  
-        with torch.no_grad():    
-            pred_mask = model_unet(x.to('cpu'))          
-        pred = torch.argmax(pred_mask, axis=1)
-        pred_np=pred.cpu().detach().numpy()
-
-        data.append([dx[0], pred_np[0]])
-
-    plt.rcParams.update({
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Helvetica"]})
-    plt.rcParams.update({'font.size': 15})
-    data= np.array(data)
-    values = np.unique(data[:,1,:,:].ravel())
-
-    fig, ax = plt.subplots(nrows=2, ncols=frame_num, figsize=(20,9), sharex=True, sharey=True)
-      
-    for d in range(len(data)):
-        im0=ax[0][d].imshow(data[d,0,:,:], origin='lower', cmap='gray')
-        im1=ax[1][d].imshow(data[d,1,:,:], origin='lower', cmap = plt.get_cmap('PiYG', 5))
-        colors = [im1.cmap(im1.norm(value)) for value in values]
-
-        ax[0][d].set_title('Original map')
-        ax[1][d].set_title('Model Predicted map')
-        ax[0][d].set_xticks([])
-        ax[1][d].set_yticks([])
-
-    patches = [mpatches.Patch(color=colors[i], 
-    label="Class: {l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
-    lgd = plt.legend(handles=patches, loc=8, bbox_to_anchor=(-1.68, -0.3, 0.5, 0.5), borderaxespad=0. , ncol=3)
-    
-    if save == True:
-        fig.savefig('ImaXplot.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+#def test_Imax(save_file, m, bin_classes, s=512, frame_num=4, save=True):
+#    fs = Granules_labelling.IMaX_maps(save_file)
+#    size = fs.shape[0]
+#    #random_ind = [random.randint(20, size-20) for x in range(frame_num)]
+#    random_ind =[24, 69, 75, 95]
+#
+#    model_unet = model.UNet(n_channels=1, n_classes=5, bilinear=False).to('cpu')
+#    model_unet.load_state_dict(m)
+#    model_unet.eval()
+#    data=[]
+#
+#    for ind in random_ind:
+#        fs.select_map(ind)
+#        map_f = fs.smap
+#        map_f = map_f/map_f.max()
+#        map_f_s = len(map_f) 
+#
+#        dx=[]
+#        if map_f_s > size:
+#            x1 = int(abs(map_f_s/2) - (s/2))
+#            x2 = int(abs(map_f_s/2) + (s/2))
+#            dx.append(map_f[x1:x2,x1:x2])
+#        else:
+#            raise ValueError('Map size lower that requested - change the requested/input size keyword')
+#
+#        dx=np.array(dx)
+#        partial = torch.unsqueeze(torch.Tensor(dx),1)
+#        x=torch.unsqueeze(partial[:,0,:,:],1)
+#  
+#        with torch.no_grad():    
+#            pred_mask = model_unet(x.to('cpu'))          
+#        pred = torch.argmax(pred_mask, axis=1)
+#        pred_np=pred.cpu().detach().numpy()
+#
+#        data.append([dx[0], pred_np[0]])
+#
+#    plt.rcParams.update({
+#    "font.family": "sans-serif",
+#    "font.sans-serif": ["Helvetica"]})
+#    plt.rcParams.update({'font.size': 15})
+#    data= np.array(data)
+#    values = np.unique(data[:,1,:,:].ravel())
+#
+#    fig, ax = plt.subplots(nrows=2, ncols=frame_num, figsize=(20,9), sharex=True, sharey=True)
+#      
+#    for d in range(len(data)):
+#        im0=ax[0][d].imshow(data[d,0,:,:], origin='lower', cmap='gray')
+#        im1=ax[1][d].imshow(data[d,1,:,:], origin='lower', cmap = plt.get_cmap('PiYG', 5))
+#        colors = [im1.cmap(im1.norm(value)) for value in values]
+#
+#        ax[0][d].set_title('Original map')
+#        ax[1][d].set_title('Model Predicted map')
+#        ax[0][d].set_xticks([])
+#        ax[1][d].set_yticks([])
+#
+#    patches = [mpatches.Patch(color=colors[i], 
+#    label="Class: {l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
+#    lgd = plt.legend(handles=patches, loc=8, bbox_to_anchor=(-1.68, -0.3, 0.5, 0.5), borderaxespad=0. , ncol=3)
+#    
+#    if save == True:
+#        fig.savefig('ImaXplot.pdf', bbox_extra_artists=(lgd,), bbox_inches='tight')
+#

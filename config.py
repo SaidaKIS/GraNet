@@ -4,11 +4,11 @@ import torch
 from easydict import EasyDict as edict
 
 cfg = edict()
-cfg.g.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-cfg.g.in_len = 6
-cfg.g.n_hidden = 32
-cfg.g.h = 64
-cfg.g.w = 64
-cfg.g.batch = 10
+cfg.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+cfg.in_len = 5
+cfg.n_hidden = 16
+cfg.h = 128
+cfg.w = 128
+cfg.batch = 4
 
 

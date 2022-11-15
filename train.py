@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import dataset
 import losses
-import model
+import model_GraNet
 import utils
 import numpy as np
 import sys
@@ -9,11 +9,12 @@ import torch
 from torch import nn
 from datetime import datetime
 from torchsummary import summary
+from config import cfg
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, loss_str, scale=1, lr = 1e-3, 
-        save_model=False, bilinear=False, model_summary=False, dropout=False):
+def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, scale=1, lr = 1e-3, 
+        save_model=False, bilinear=False, model_summary=False):
 
     CE_weights = torch.Tensor([1.0,10.0,10.0,10.0,1.0]).to(device)
 
@@ -24,20 +25,19 @@ def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, loss_str, scale=1, l
     if loss_str == 'mIoU':
         criterion = losses.mIoULoss(n_classes=5, weight=CE_weights).to(device)
 
-    test_num = int(0.05 * l)
+    test_num = int(0.1 * l)
     print("Training set")
     data_train=dataset.segDataset(root+'Train/', l=l-test_num, s=size_boxes)
     print("Validating set")
     data_test=dataset.segDataset_val(root+'Validate/', l=test_num, s=size_boxes)
     
-    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=True, num_workers=1)
-    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=False, num_workers=1)
+    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=True, num_workers=1, drop_last=True)
+    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=False, num_workers=1, drop_last=True)
     
     n_class = len(data_train.bin_classes)
     
-    model_unet = model.UNet(n_channels=channels, n_classes=n_class, scale=scale, bilinear=bilinear, dropout=dropout).to(device)
-    if model_summary == True:
-        summary(model_unet, (channels, size_boxes, size_boxes))
+    model_unet = model_GraNet.GraNet(n_channels=channels, n_classes=n_class, n_seq=seq_len, n_hidden=cfg.n_hidden,
+                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=bilinear).to(device)
     
     optimizer = torch.optim.Adam(model_unet.parameters(), lr=lr)
     #Ajust learing rate

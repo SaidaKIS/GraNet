@@ -33,12 +33,13 @@ if __name__ == '__main__':
                    'Complex-shaped granules']
 
     #Parameters
-    root = 'data/Masks_C/' # Raw full IMaX maps (6 for training and 1 for validate)
-    l = 30000 # Submaps dataset size 
+    root = '../data/Masks_test/' # Raw full IMaX maps (6 for training and 1 for validate)
+    l = 100 # Submaps dataset size 
     size_box = 128 # size of each submap
     channels = 1
-    N_EPOCHS = 200 
-    BACH_SIZE = 32  
+    N_EPOCHS = 2 
+    seq_len = 5
+    BACH_SIZE = 4  
     loss = 'FocalLoss' # 'CrossEntropy', 'FocalLoss', 'mIoU'
     save_model = False
     bilinear = False # Unet upsampling mechanisim is Traspose convolution
@@ -46,9 +47,15 @@ if __name__ == '__main__':
     lr = 1e-3
     dropout = False
 
-    data=dataset.segDataset(root,l=2000, s=size_box)
-    for i in range(2):
-        img, mask, ind, c = data[i]
+    #data=dataset.segDataset(root, l=10, s=size_box, seq_len=seq_len)
+    #imgs, mask = data[0]
+#
+    #fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
+    #for i in range(5):
+    #    ax[i].imshow(imgs[0,i,:,:], origin='lower', cmap='gray')
+    #ax[-1].imshow(mask, origin='lower')
+    #plt.show()
+
 
 
 
@@ -75,15 +82,15 @@ if __name__ == '__main__':
     #        plt.show()
     #print(prop.mean())
     #
-    file_list = sorted(glob(root+'*.npz'))
-    file = np.load(file_list[0])
+    #file_list = sorted(glob(root+'*.npz'))
+    #file = np.load(file_list[0])
     #mask = file['cmask_map'].astype(np.float32)
     #c = np.array(centre)
     #utils.test_centers(mask, c[:,0], c[:,1])
 
     ##Train a model
-    #train.run(root, l, size_box, channels, N_EPOCHS, BACH_SIZE, loss, lr = lr, scale=1,
-    #    save_model=True, bilinear=False, model_summary=False, dropout=dropout)
+    train.run(root, l, size_box, channels, N_EPOCHS, BACH_SIZE, seq_len, loss, lr = lr, scale=1,
+        save_model=True, bilinear=False, model_summary=False)
 
     #Test model
     #Initial summary

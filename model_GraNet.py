@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
 import numpy as np
+from torchsummary import summary
 
 from config import cfg
 
@@ -22,7 +23,7 @@ https://github.com/EBroock/FarNet-II/blob/main/FarNet_II.py
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels, dropout=False):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
@@ -32,8 +33,6 @@ class DoubleConv(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         ]
-        if dropout:
-            layers.append(nn.Dropout())
 
         self.double_conv = nn.Sequential(*layers)
 
@@ -107,11 +106,11 @@ class inconv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels, dropout=False):
+    def __init__(self, in_channels, out_channels):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels, dropout=dropout)
+            DoubleConv(in_channels, out_channels)
         )
 
     def forward(self, x):
@@ -120,16 +119,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear=True, dropout=False):
+    def __init__(self, in_channels, out_channels, bilinear):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2, dropout=dropout)
+            self.conv = DoubleConv(in_channels, out_channels)
         else:
-            self.up = nn.ConvTranspose2d(in_channels , in_channels // 2, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels, dropout=dropout)
+            self.up = nn.ConvTranspose2d(in_channels , out_channels, kernel_size=2, stride=2)
+            self.conv = DoubleConv(in_channels, out_channels)
 
 
     def forward(self, x1, x2):
@@ -141,6 +140,7 @@ class Up(nn.Module):
 
         x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
                         diffY // 2, diffY - diffY // 2])
+
 
         x = torch.cat((x2, x1), dim=1)
         return self.conv(x)
@@ -176,8 +176,8 @@ class AttentionBlock(nn.Module):
         return out*x
 
 class GraNet(nn.Module):
-    def __init__(self, n_channels, n_classes, n_seq=cfg.g.in_len, n_hidden=cfg.g.n_hidden,
-                h=cfg.g.h, w=cfg.g.w, batch=cfg.g.batch, bilinear=True, dropout=False):
+    def __init__(self, n_channels, n_classes, n_seq=cfg.in_len, n_hidden=cfg.n_hidden,
+                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=False):
         super(GraNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
@@ -185,48 +185,47 @@ class GraNet(nn.Module):
         self.batch = batch
         self.n_seq = n_seq
 
-        self.inc = DoubleConv(n_channels, self.n_hidden)
-        self.down1 = Down(self.n_hidden, 2*self.n_hidden)
-        self.down2 = Down(2*self.n_hidden, 4*self.n_hidden, dropout=dropout)
-        self.down3 = Down(4*self.n_hidden, 8*self.n_hidden, dropout=dropout)
-        self.down4 = Down(8*self.n_hidden, 16*self.n_hidden, dropout=dropout)
+        self.inc = DoubleConv(n_channels, n_hidden)
+        self.down1 = Down(n_hidden, 2*n_hidden)
+        self.down2 = Down(2*n_hidden, 4*n_hidden)
+        self.down3 = Down(4*n_hidden, 8*n_hidden)
+        self.down4 = Down(8*n_hidden, 16*n_hidden)
 
-        self.LSTM1 = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch,h,w))
-        self.LSTM1_inv = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch,h,w))
+        self.LSTM1 = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
+        self.LSTM1_inv = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
         self.conv1 = inconv(self.n_seq*2,self.n_seq)
-        self.att1 = AttentionBlock(16*n_hidden,16*n_hidden,int(8*n_hidden))
-        self.up1 = Up(16*n_hidden,8*n_hidden)
+        self.att1 = AttentionBlock(8*n_hidden,16*n_hidden,int(8*n_hidden))
+        self.up1 = Up(16*n_hidden,8*n_hidden, bilinear=bilinear)
     
-        self.LSTM2 = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch,2*h,2*w))
-        self.LSTM2_inv = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch,2*h,2*w))
+        self.LSTM2 = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
+        self.LSTM2_inv = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
         self.conv2 = inconv(self.n_seq*2,self.n_seq)
-        self.att2 = AttentionBlock(8*n_hidden,8*n_hidden,int(4*n_hidden))
-        self.up2 = Up(8*n_hidden,4*n_hidden)
+        self.att2 = AttentionBlock(4*n_hidden,8*n_hidden,int(4*n_hidden))
+        self.up2 = Up(8*n_hidden,4*n_hidden, bilinear=bilinear)
 
-        self.LSTM3 = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch,4*h,4*w))
-        self.LSTM3_inv = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch,4*h,4*w))
+        self.LSTM3 = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
+        self.LSTM3_inv = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
         self.conv3 = inconv(self.n_seq*2,self.n_seq)
-        self.att3 = AttentionBlock(4*n_hidden,4*n_hidden,int(2*n_hidden))
-        self.up3 = Up(4*n_hidden,2*n_hidden)
+        self.att3 = AttentionBlock(2*n_hidden,4*n_hidden,int(2*n_hidden))
+        self.up3 = Up(4*n_hidden,2*n_hidden, bilinear=bilinear)
 
-        self.LSTM4 = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch,8*h,8*w))
-        self.LSTM4_inv = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch,8*h,8*w))
+        self.LSTM4 = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
+        self.LSTM4_inv = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
         self.conv4 = inconv(self.n_seq*2,self.n_seq)
-        self.att4 = AttentionBlock(2*n_hidden,2*n_hidden,n_hidden)
-        self.up4 = Up(2*n_hidden,n_hidden)
+        self.att4 = AttentionBlock(n_hidden,2*n_hidden,n_hidden)
+        self.up4 = Up(2*n_hidden,n_hidden, bilinear=bilinear)
 
         self.outc = OutConv(n_hidden, n_classes)
 
     def forward(self, x):
 
-        x = x[:,:,np.newaxis,:,:]
-        
+        #x = x[:,:,np.newaxis,:,:]
+        x = rearrange(x,'B C S H W -> B S C H W')
         x = rearrange(x,'B S C H W -> (B S) C H W')
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
-        x3_2 = self.dropout1(x3)
-        x4 = self.down3(x3_2)
+        x4 = self.down3(x3)
         x5 = self.down4(x4)
 
         x5 = rearrange(x5,'(B S) C H W -> B S C H W', B=self.batch)
@@ -302,7 +301,10 @@ class GraNet(nn.Module):
         upx2 = self.up4(x2LSTM,att4x2)
         
         x = self.outc(upx2)
-        x = rearrange(x,'(B S) C H W -> B S C H W',B=self.batch)
-        x = rearrange(x,'B S C H W -> B (S C) H W')
-        logits = self.outc(x[:,int(self.n_seq / 2),:,:])
+
+        x = rearrange(x,'(B S) C H W -> B S C H W', B=self.batch)
+
+        logits = x[:,int(self.n_seq / 2),:,:,:]
+        print(logits.shape)
+
         return logits
