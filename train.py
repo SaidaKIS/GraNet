@@ -11,10 +11,10 @@ from datetime import datetime
 from torchsummary import summary
 from config import cfg
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = cfg.device
 
-def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, scale=1, lr = 1e-3, 
-        save_model=False, bilinear=False, model_summary=False):
+def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
+         BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, save_config=False, bilinear=False):
 
     CE_weights = torch.Tensor([1.0,10.0,10.0,10.0,1.0]).to(device)
 
@@ -56,6 +56,7 @@ def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, s
         model_unet.train()
         loss_list = []
         acc_list = []
+
         for batch_i, (x, y) in enumerate(train_dataloader):
         
             pred_mask = model_unet(x.to(device))  
@@ -95,7 +96,7 @@ def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, s
             val_loss = criterion(pred_mask, y.to(device))
             pred_mask_class = torch.argmax(pred_mask, axis=1)
     
-            val_overall_pa, val_per_class_pa, val_jaccard_index, val_dice_index = utils.eval_metrics_sem(y.to(device), pred_mask_class.to(device), 5, device)
+            val_overall_pa, val_per_class_pa, val_jaccard_index, val_dice_index, pc_opa, pc_j, pc_d = utils.eval_metrics_sem(y.to(device), pred_mask_class.to(device), n_class, device)
             val_overall_pa_list.append(val_overall_pa.cpu().detach().numpy())
             val_per_class_pa_list.append(val_per_class_pa.cpu().detach().numpy())
             val_jaccard_index_list.append(val_jaccard_index.cpu().detach().numpy())
@@ -119,7 +120,7 @@ def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, s
         compare_loss = np.mean(val_loss_list)
         is_best = compare_loss < min_loss
         print(min_loss, compare_loss)
-        if is_best == True and save_model == True:
+        if is_best == True and save_config == True:
             print("Best_model")      
             scheduler_counter = 0
             min_loss = min(compare_loss, min_loss)
@@ -134,21 +135,14 @@ def run(root, l, size_boxes, channels, N_EPOCHS, BACH_SIZE, seq_len, loss_str, s
             print("Final Model")
             torch.save(model_unet.state_dict(), 'model_params/unet_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
     
-    if save_model == True:
+    if save_config == True:
         dt = datetime.now()
-        dict = OrderedDict()
-        dict['root'] = root
-        dict['dataset_lenght'] = l
-        dict['size_boxes'] = size_boxes
-        dict['channels'] = channels
-        dict['Number_epochs'] = N_EPOCHS
-        dict['Bach_size'] = BACH_SIZE
-        dict['Loss'] = loss_str
-        dict['bilinear'] = bilinear
-        dict['Optimizer_lr'] = lr
-        dict['Scale'] = scale
         with open('model_params/Train_params_{}.npy'.format(dt), 'wb') as f:
-            np.save(f, dict)
             np.save(f, save_losses)
             np.save(f, save_h_train_losses)
             np.save(f, save_h_val_losses)
+        with open('model_params/Train_params_{}.txt'.format(dt), 'wb') as f:
+            for key, value in cfg.items():
+                line = str(key) + " : "+str(value)+"\n"
+                f.write(line.encode())
+                

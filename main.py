@@ -12,7 +12,7 @@ import io
 import pickle
 import pandas as pd
 from glob import glob
-from torchsummary import summary
+from config import cfg
 
 #change this in general 
 #/Users/smdiazcas/miniconda/envs/pyUnet/lib/python3.9/site-packages/torch/storage.py
@@ -26,26 +26,6 @@ def flatten(t):
     return [item for sublist in t for item in sublist]
 
 if __name__ == '__main__':
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(device)
-
-    bin_classes = ['Intergranular lane', 'Uniform-shaped granules', 'Granules with a dot', 'Granules with a lane',
-                   'Complex-shaped granules']
-
-    #Parameters
-    root = '../data/Masks_test/' # Raw full IMaX maps (6 for training and 1 for validate)
-    l = 100 # Submaps dataset size 
-    size_box = 128 # size of each submap
-    channels = 1
-    N_EPOCHS = 2 
-    seq_len = 5
-    BACH_SIZE = 4  
-    loss = 'FocalLoss' # 'CrossEntropy', 'FocalLoss', 'mIoU'
-    save_model = False
-    bilinear = False # Unet upsampling mechanisim is Traspose convolution
-    model_summary = True
-    lr = 1e-3
-    dropout = False
 
     #data=dataset.segDataset(root, l=10, s=size_box, seq_len=seq_len)
     #imgs, mask = data[0]
@@ -55,9 +35,6 @@ if __name__ == '__main__':
     #    ax[i].imshow(imgs[0,i,:,:], origin='lower', cmap='gray')
     #ax[-1].imshow(mask, origin='lower')
     #plt.show()
-
-
-
 
     #prop=pd.DataFrame(columns=[0, 1, 2, 3, 4], index=np.arange(0,2000))
     #data=dataset.segDataset(root,l=2000, s=size_box)
@@ -88,9 +65,8 @@ if __name__ == '__main__':
     #c = np.array(centre)
     #utils.test_centers(mask, c[:,0], c[:,1])
 
-    ##Train a model
-    train.run(root, l, size_box, channels, N_EPOCHS, BACH_SIZE, seq_len, loss, lr = lr, scale=1,
-        save_model=True, bilinear=False, model_summary=False)
+    ##Train a model using a config file 
+    train.run(save_config=True, bilinear=False) # Unet upsampling mechanisim is Traspose convolution
 
     #Test model
     #Initial summary

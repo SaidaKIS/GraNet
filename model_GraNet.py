@@ -58,7 +58,7 @@ class ConvLSTM(nn.Module):
         self._input_channel = input_channel
         self._num_filter = num_filter
 
-    def forward(self, inputs=None, states=None, seq_len=cfg.in_len):
+    def forward(self, inputs=None, states=None, seq_len=cfg.seq_len):
 
         if states is None:
             c = torch.zeros((inputs.size(1), self._num_filter, self._state_height,
@@ -176,7 +176,7 @@ class AttentionBlock(nn.Module):
         return out*x
 
 class GraNet(nn.Module):
-    def __init__(self, n_channels, n_classes, n_seq=cfg.in_len, n_hidden=cfg.n_hidden,
+    def __init__(self, n_channels, n_classes, n_seq=cfg.seq_len, n_hidden=cfg.n_hidden,
                 h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=False):
         super(GraNet, self).__init__()
         self.n_channels = n_channels
@@ -305,6 +305,5 @@ class GraNet(nn.Module):
         x = rearrange(x,'(B S) C H W -> B S C H W', B=self.batch)
 
         logits = x[:,int(self.n_seq / 2),:,:,:]
-        print(logits.shape)
 
         return logits
