@@ -12,6 +12,7 @@ from torchsummary import summary
 from config import cfg
 
 device = cfg.device
+print(device)
 
 def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
          BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, save_config=False, bilinear=False):
