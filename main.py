@@ -66,7 +66,7 @@ if __name__ == '__main__':
     #utils.test_centers(mask, c[:,0], c[:,1])
 
     ##Train a model using a config file 
-    train.run(save_config=True, bilinear=False) # Unet upsampling mechanisim is Traspose convolution
+    #train.run(save_config=True, bilinear=False) # Unet upsampling mechanisim is Traspose convolution
 
     #Test model
     #Initial summary
@@ -132,15 +132,13 @@ if __name__ == '__main__':
     #utils.test_Imax(imax_save, model_test1, bin_classes)
    
     #Training information
-    #with open ('../New_results/NewGT_Jan2022/Augmentation/Train_params_2022_02_15_11_57_49_FL_fullModel_nonDp_highaug_lr6e-3.npy', 'rb') as f:
-    ##with open ('../New_results/NewGT_Jan2022/Augmentation/Train_params_2022-02-05_03_00_00_IoU_non_Dropout.npy', 'rb') as f:    
-    #    training_info = np.load(f, allow_pickle=True)
-    #    metrics = np.load(f, allow_pickle=True)
+    with open ('../Train_params_2022_11_21_46_30_initial_test.npy', 'rb') as f:
+        metrics = np.load(f, allow_pickle=True)
     #    h_train_metrics = np.load(f, allow_pickle=True)
     #    h_val_metrics = np.load(f, allow_pickle=True)
 ####
     #print(training_info)
-    #utils.metrics_plots(metrics, Title='Test 5: Focal Loss $\gamma = 10$ lr - 0.006')
+    utils.metrics_plots(metrics, Title='Test 1: Focal Loss $\gamma = 10$')
     #utils.metrics_plots(metrics, Title='Test 2: Mean Intersection-over-Union (mIoU)')
 ##
     #h_lt=[]

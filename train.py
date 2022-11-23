@@ -138,11 +138,12 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     
     if save_config == True:
         dt = datetime.now()
-        with open('model_params/Train_params_{}.npy'.format(dt), 'wb') as f:
+        stdt = dt.strftime("%m_%d_%Y_%H_%M_%S")
+        with open('model_params/Train_params_{}.npy'.format(stdt), 'wb') as f:
             np.save(f, save_losses)
             np.save(f, save_h_train_losses)
             np.save(f, save_h_val_losses)
-        with open('model_params/Train_params_{}.txt'.format(dt), 'wb') as f:
+        with open('model_params/Train_params_{}.txt'.format(stdt), 'wb') as f:
             for key, value in cfg.items():
                 line = str(key) + " : "+str(value)+"\n"
                 f.write(line.encode())
