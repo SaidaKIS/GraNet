@@ -200,7 +200,7 @@ class segDataset(torch.utils.data.Dataset):
     self.transform_serie = Secuential_trasn([Ttorch.ToTensor(),
                                             SRS_crop(self.size),
                                             RotationTransform(angles=[0, 90, 180, 270]),
-                                            Ttorch.RandomPerspective(0.3,p=0.5, interpolation=Ttorch.InterpolationMode.NEAREST),
+                                            #Ttorch.RandomPerspective(0.3,p=0.5, interpolation=Ttorch.InterpolationMode.NEAREST),
                                             Ttorch.RandomHorizontalFlip(p=0.5),
                                             Ttorch.RandomVerticalFlip(p=0.5)
                                             ])

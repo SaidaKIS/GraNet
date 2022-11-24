@@ -13,6 +13,7 @@ import pickle
 import pandas as pd
 from glob import glob
 from config import cfg
+import sys
 
 #change this in general 
 #/Users/smdiazcas/miniconda/envs/pyUnet/lib/python3.9/site-packages/torch/storage.py
@@ -27,14 +28,14 @@ def flatten(t):
 
 if __name__ == '__main__':
 
-    #data=dataset.segDataset(root, l=10, s=size_box, seq_len=seq_len)
-    #imgs, mask = data[0]
+    data=dataset.segDataset(cfg.root+'Train/', l=10, s=cfg.h, seq_len=cfg.seq_len)
+    imgs, mask = data[0]
 #
-    #fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
-    #for i in range(5):
-    #    ax[i].imshow(imgs[0,i,:,:], origin='lower', cmap='gray')
-    #ax[-1].imshow(mask, origin='lower')
-    #plt.show()
+    fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
+    for i in range(5):
+        ax[i].imshow(imgs[0,i,:,:], origin='lower', cmap='gray')
+        ax[-1].imshow(mask, origin='lower')
+    plt.show()
 
     #prop=pd.DataFrame(columns=[0, 1, 2, 3, 4], index=np.arange(0,2000))
     #data=dataset.segDataset(root,l=2000, s=size_box)
@@ -132,13 +133,13 @@ if __name__ == '__main__':
     #utils.test_Imax(imax_save, model_test1, bin_classes)
    
     #Training information
-    #with open ('../Train_params_2022_11_21_46_30_initial_test.npy', 'rb') as f:
+    #with open ('../Tests/model_params_test2/Train_params_11_23_2022_13_14_36.npy', 'rb') as f:
     #    metrics = np.load(f, allow_pickle=True)
     #    h_train_metrics = np.load(f, allow_pickle=True)
     #    h_val_metrics = np.load(f, allow_pickle=True)
 ####
     #print(training_info)
-    #utils.metrics_plots(metrics, Title='Test 1: Focal Loss $\gamma = 10$')
+    #utils.metrics_plots(metrics, Title='Test 2: Focal Loss $\gamma = 10$')
     #utils.metrics_plots(metrics, Title='Test 2: Mean Intersection-over-Union (mIoU)')
 ##
     #h_lt=[]

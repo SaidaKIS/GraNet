@@ -10,6 +10,7 @@ from torch import nn
 from datetime import datetime
 from torchsummary import summary
 from config import cfg
+import matplotlib.pyplot as plt
 
 device = cfg.device
 print(device)
@@ -59,11 +60,22 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
         acc_list = []
 
         for batch_i, (x, y) in enumerate(train_dataloader):
+
+            print(x.shape)
+            print(y.shape)
+
+            fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
+            for i in range(5):
+                ax[i].imshow(x[batch_i,0,i,:,:], origin='lower', cmap='gray')
+                ax[-1].imshow(y[batch_i], origin='lower')
+            plt.show()
+            sys.exit()
+
+            optimizer.zero_grad()
         
             pred_mask = model_unet(x.to(device))  
             loss = criterion(pred_mask, y.to(device))
     
-            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             loss_list.append(loss.cpu().detach().numpy())
