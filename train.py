@@ -16,7 +16,7 @@ device = cfg.device
 print(device)
 
 def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
-         BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, save_config=False, bilinear=False):
+         BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, dropout = cfg.dropout, save_config=False, bilinear=False):
 
     CE_weights = torch.Tensor([1.0,10.0,10.0,10.0,1.0]).to(device)
 
@@ -29,7 +29,7 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
 
     test_num = int(0.1 * l)
     print("Training set")
-    data_train=dataset.segDataset(root+'Train/', l=l-test_num, s=size_boxes)
+    data_train=dataset.segDataset(root+'Train/', l=l-test_num, s=size_boxes, seq_len=seq_len)
     print("Validating set")
     data_test=dataset.segDataset_val(root+'Validate/', l=test_num, s=size_boxes)
     
@@ -38,8 +38,10 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     
     n_class = len(data_train.bin_classes)
     
+    print(dropout)
+
     model_unet = model_GraNet.GraNet(n_channels=channels, n_classes=n_class, n_seq=seq_len, n_hidden=cfg.n_hidden,
-                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=bilinear).to(device)
+                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=bilinear, dropout=dropout).to(device)
     
     optimizer = torch.optim.Adam(model_unet.parameters(), lr=lr)
     #Ajust learing rate
@@ -61,15 +63,15 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
 
         for batch_i, (x, y) in enumerate(train_dataloader):
 
-            print(x.shape)
-            print(y.shape)
+            #print(x.shape)
+            #print(y.shape)
 
-            fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
-            for i in range(5):
-                ax[i].imshow(x[batch_i,0,i,:,:], origin='lower', cmap='gray')
-                ax[-1].imshow(y[batch_i], origin='lower')
-            plt.show()
-            sys.exit()
+            #fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
+            #for i in range(5):
+            #    ax[i].imshow(x[batch_i,0,i,:,:], origin='lower', cmap='gray')
+            #    ax[-1].imshow(y[batch_i], origin='lower')
+            #plt.show()
+            #sys.exit()
 
             optimizer.zero_grad()
         

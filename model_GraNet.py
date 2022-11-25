@@ -23,7 +23,7 @@ https://github.com/EBroock/FarNet-II/blob/main/FarNet_II.py
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, dropout=False):
         super().__init__()
         layers = [
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
@@ -33,6 +33,9 @@ class DoubleConv(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         ]
+
+        if dropout:
+            layers.append(nn.Dropout())
 
         self.double_conv = nn.Sequential(*layers)
 
@@ -95,9 +98,9 @@ class ConvLSTM(nn.Module):
 class inconv(nn.Module):
     "Initial convolution and return to the sequencial dimension loossed during bi-directional LSTM concatenation"
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, dropout=False):
         super().__init__()
-        self.conv = DoubleConv(in_channels, out_channels)
+        self.conv = DoubleConv(in_channels, out_channels, dropout=dropout)
 
     def forward(self, x):
         x = self.conv(x)
@@ -106,11 +109,11 @@ class inconv(nn.Module):
 class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, out_channels, dropout=False):
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
+            DoubleConv(in_channels, out_channels, dropout=dropout)
         )
 
     def forward(self, x):
@@ -119,16 +122,16 @@ class Down(nn.Module):
 class Up(nn.Module):
     """Upscaling then double conv"""
 
-    def __init__(self, in_channels, out_channels, bilinear):
+    def __init__(self, in_channels, out_channels, bilinear, dropout=False):
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, dropout=dropout)
         else:
             self.up = nn.ConvTranspose2d(in_channels , out_channels, kernel_size=2, stride=2)
-            self.conv = DoubleConv(in_channels, out_channels)
+            self.conv = DoubleConv(in_channels, out_channels, dropout=dropout)
 
 
     def forward(self, x1, x2):
@@ -177,43 +180,44 @@ class AttentionBlock(nn.Module):
 
 class GraNet(nn.Module):
     def __init__(self, n_channels, n_classes, n_seq=cfg.seq_len, n_hidden=cfg.n_hidden,
-                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=False):
+                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=False, dropout = False):
         super(GraNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
         self.bilinear = bilinear
         self.batch = batch
         self.n_seq = n_seq
+        self.dropout = dropout
 
-        self.inc = DoubleConv(n_channels, n_hidden)
-        self.down1 = Down(n_hidden, 2*n_hidden)
-        self.down2 = Down(2*n_hidden, 4*n_hidden)
-        self.down3 = Down(4*n_hidden, 8*n_hidden)
-        self.down4 = Down(8*n_hidden, 16*n_hidden)
+        self.inc = DoubleConv(n_channels, n_hidden, dropout=self.dropout)
+        self.down1 = Down(n_hidden, 2*n_hidden, dropout=self.dropout)
+        self.down2 = Down(2*n_hidden, 4*n_hidden, dropout=self.dropout)
+        self.down3 = Down(4*n_hidden, 8*n_hidden, dropout=self.dropout)
+        self.down4 = Down(8*n_hidden, 16*n_hidden, dropout=self.dropout)
 
         self.LSTM1 = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
         self.LSTM1_inv = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
-        self.conv1 = inconv(self.n_seq*2,self.n_seq)
+        self.conv1 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
         self.att1 = AttentionBlock(8*n_hidden,16*n_hidden,int(8*n_hidden))
-        self.up1 = Up(16*n_hidden,8*n_hidden, bilinear=bilinear)
+        self.up1 = Up(16*n_hidden,8*n_hidden, bilinear=bilinear, dropout=self.dropout)
     
         self.LSTM2 = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
         self.LSTM2_inv = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
-        self.conv2 = inconv(self.n_seq*2,self.n_seq)
+        self.conv2 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
         self.att2 = AttentionBlock(4*n_hidden,8*n_hidden,int(4*n_hidden))
-        self.up2 = Up(8*n_hidden,4*n_hidden, bilinear=bilinear)
+        self.up2 = Up(8*n_hidden,4*n_hidden, bilinear=bilinear, dropout=self.dropout)
 
         self.LSTM3 = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
         self.LSTM3_inv = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
-        self.conv3 = inconv(self.n_seq*2,self.n_seq)
+        self.conv3 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
         self.att3 = AttentionBlock(2*n_hidden,4*n_hidden,int(2*n_hidden))
-        self.up3 = Up(4*n_hidden,2*n_hidden, bilinear=bilinear)
+        self.up3 = Up(4*n_hidden,2*n_hidden, bilinear=bilinear, dropout=self.dropout)
 
         self.LSTM4 = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
         self.LSTM4_inv = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
-        self.conv4 = inconv(self.n_seq*2,self.n_seq)
+        self.conv4 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
         self.att4 = AttentionBlock(n_hidden,2*n_hidden,n_hidden)
-        self.up4 = Up(2*n_hidden,n_hidden, bilinear=bilinear)
+        self.up4 = Up(2*n_hidden,n_hidden, bilinear=bilinear, dropout=self.dropout)
 
         self.outc = OutConv(n_hidden, n_classes)
 
