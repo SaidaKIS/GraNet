@@ -15,7 +15,7 @@ cfg.batch = 32
 cfg.bin_classes = ['Intergranular lane', 'Uniform-shaped granules', 'Granules with a dot', 'Granules with a lane',
                 'Complex-shaped granules']
 cfg.channels = 1 # initial channels
-cfg.N_EPOCHS = 100 
+cfg.N_EPOCHS = 100
 cfg.loss = 'FocalLoss' # 'CrossEntropy', 'FocalLoss', 'mIoU'
 cfg.lr = 3e-4 #Learing rate - inicial 1e-3 test 3e-4
 cfg.dropout = True

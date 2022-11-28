@@ -8,7 +8,6 @@ import sys
 import torch
 from torch import nn
 from datetime import datetime
-from torchsummary import summary
 from config import cfg
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -150,14 +149,15 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
 
             i_cmap=plt.get_cmap('PiYG', 5)
             list_cmap = i_cmap(range(5))
-            p_cmap = ListedColormap(list_cmap)
 
             fig, ax = plt.subplots(nrows=1, ncols=7, sharex=True, sharey=True)
             fig.set_size_inches(15, 5)
             for i in range(5):
                 im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-                im1=ax[-2].imshow(y_p, origin='lower', cmap = p_cmap)
-                im2=ax[-1].imshow(pred_p, origin='lower', cmap = p_cmap)
+            l_values1 = np.unique(y_p)
+            l_values2 = np.unique(pred_p)
+            im1=ax[-2].imshow(y_p, origin='lower', cmap=ListedColormap(list_cmap[l_values1]))
+            im2=ax[-1].imshow(pred_p, origin='lower', cmap=ListedColormap(list_cmap[l_values2]))
 
             colors = [list_cmap[value] for value in values]
             patches = [mpatches.Patch(color=colors[i], 
@@ -176,8 +176,10 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             fig.set_size_inches(15, 5)
             for i in range(5):
                 im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-                im1=ax[-2].imshow(y_p, origin='lower', cmap = p_cmap)
-                im2=ax[-1].imshow(pred_p, origin='lower', cmap = p_cmap)
+            l_values1 = np.unique(y_p)
+            l_values2 = np.unique(pred_p)
+            im1=ax[-2].imshow(y_p, origin='lower', cmap = ListedColormap(list_cmap[l_values1]))
+            im2=ax[-1].imshow(pred_p, origin='lower', cmap = ListedColormap(list_cmap[l_values2]))
 
             colors = [list_cmap[value] for value in values]
             patches = [mpatches.Patch(color=colors[i], 
