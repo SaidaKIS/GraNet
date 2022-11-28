@@ -288,7 +288,8 @@ class segDataset(torch.utils.data.Dataset):
         return self.l
 
 class segDataset_val(torch.utils.data.Dataset):
-  def __init__(self, root, l=1000, s=128):
+
+  def __init__(self, root, l=1000, s=128, seq_len=5):
     super(segDataset_val, self).__init__()
     self.root = root
     self.size = s
@@ -341,7 +342,10 @@ class segDataset_val(torch.utils.data.Dataset):
         
   def __getitem__(self, idx):
     
-    ind = np.random.randint(low=0, high=len(self.ts_smap))
+    if len(self.ts_smap) > 3:
+      ind = np.random.randint(low=0, high=len(self.ts_smap))
+    else:
+      ind = 0
     ts_smap = self.ts_smap[ind]
     mask_smap = self.mask_smap[ind]
 
@@ -360,7 +364,6 @@ class segDataset_val(torch.utils.data.Dataset):
     self.mask = img_t[-1].type(torch.int64)
     #return self.image, self.mask, ind, c  #for test central points
     return self.images, self.mask
-  
   
   def __len__(self):
         return self.l
