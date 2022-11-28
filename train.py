@@ -11,6 +11,9 @@ from datetime import datetime
 from torchsummary import summary
 from config import cfg
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
 
 device = cfg.device
 
@@ -142,30 +145,48 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             y_p = train_xypred[0][1]
             pred_p = train_xypred[0][2]
 
+            values = [0,1,2,3,4]
+            bin_classes = data_train.bin_classes
+
+            i_cmap=plt.get_cmap('PiYG', 5)
+            list_cmap = i_cmap(range(5))
+            p_cmap = ListedColormap(list_cmap)
+
             fig, ax = plt.subplots(nrows=1, ncols=7, sharex=True, sharey=True)
-            fig.set_size_inches(10, 5)
+            fig.set_size_inches(15, 5)
             for i in range(5):
-                ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-                ax[-2].imshow(y_p, origin='lower')
-                ax[-1].imshow(pred_p, origin='lower')
+                im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
+                im1=ax[-2].imshow(y_p, origin='lower', cmap = p_cmap)
+                im2=ax[-1].imshow(pred_p, origin='lower', cmap = p_cmap)
+
+            colors = [list_cmap[value] for value in values]
+            patches = [mpatches.Patch(color=colors[i], 
+            label="{l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
+            lgd = plt.legend(handles=patches, bbox_to_anchor=(2.5, 0.75), loc=1, borderaxespad=0. , ncol=1)
+
             fig.suptitle('Model_Train_Epoch_{}'.format(epoch))
             plt.tight_layout()
-            plt.savefig("Train_epoch_{}.png".format(epoch), dpi=200)
+            plt.savefig("Train_epoch_{}.png".format(epoch), dpi=200, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
-            print(len(test_xypred))
             x_p = test_xypred[0][0]
             y_p = test_xypred[0][1]
             pred_p = test_xypred[0][2]
+
             fig, ax = plt.subplots(nrows=1, ncols=7, sharex=True, sharey=True)
-            fig.set_size_inches(10, 5)
+            fig.set_size_inches(15, 5)
             for i in range(5):
-                ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-                ax[-2].imshow(y_p, origin='lower')
-                ax[-1].imshow(pred_p, origin='lower')
+                im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
+                im1=ax[-2].imshow(y_p, origin='lower', cmap = p_cmap)
+                im2=ax[-1].imshow(pred_p, origin='lower', cmap = p_cmap)
+
+            colors = [list_cmap[value] for value in values]
+            patches = [mpatches.Patch(color=colors[i], 
+            label="{l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
+            lgd = plt.legend(handles=patches, bbox_to_anchor=(2.5, 0.75), loc=1, borderaxespad=0. , ncol=1)
+
             fig.suptitle('Model_test_Epoch_{}'.format(epoch))
             plt.tight_layout()
-            plt.savefig("Test_epoch_{}.png".format(epoch), dpi=200)
-
+            plt.savefig("Test_epoch_{}.png".format(epoch), dpi=200, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
         save_losses.append([epoch, np.mean(loss_list), np.mean(acc_list), np.mean(val_loss_list),  np.mean(val_acc_list),
                             np.mean(val_overall_pa_list), np.mean(val_per_class_pa_list),
