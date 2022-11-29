@@ -32,7 +32,7 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     print("Training set")
     data_train=dataset.segDataset(root+'Train/', l=l-test_num, s=size_boxes, seq_len=seq_len)
     print("Validating set")
-    data_test=dataset.segDataset_val(root+'Validate/', l=test_num, s=size_boxes, seq_len=seq_len)
+    data_test=dataset.segDataset_val(root+'Train/', l=test_num, s=size_boxes, seq_len=seq_len)
     
     train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=True, num_workers=1, drop_last=True)
     test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=False, num_workers=1, drop_last=True)

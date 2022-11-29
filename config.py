@@ -11,7 +11,7 @@ cfg.seq_len = 5 # Length of the temporal sequence
 cfg.n_hidden = 16 # initial hidden layers
 cfg.h = 128 #height of the box
 cfg.w = 128 #width of the box
-cfg.batch = 32 
+cfg.batch = 32
 cfg.bin_classes = ['Intergranular lane', 'Uniform-shaped granules', 'Granules with a dot', 'Granules with a lane',
                 'Complex-shaped granules']
 cfg.channels = 1 # initial channels

@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     #data=dataset.segDataset(cfg.root+'Train/', l=10, s=cfg.h, seq_len=cfg.seq_len)
     #imgs, mask = data[0]
-##
+###
     #fig, ax = plt.subplots(nrows=1, ncols=6, sharex=True, sharey=True)
     #for i in range(5):
     #    ax[i].imshow(imgs[0,i,:,:], origin='lower', cmap='gray')
