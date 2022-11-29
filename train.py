@@ -158,6 +158,8 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             l_values2 = np.unique(pred_p)
             im1=ax[-2].imshow(y_p, origin='lower', cmap=ListedColormap(list_cmap[l_values1]))
             im2=ax[-1].imshow(pred_p, origin='lower', cmap=ListedColormap(list_cmap[l_values2]))
+            ax[-2].set_title('{}'.format(l_values1))
+            ax[-1].set_title('{}'.format(l_values2))
 
             colors = [list_cmap[value] for value in values]
             patches = [mpatches.Patch(color=colors[i], 
@@ -180,6 +182,8 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             l_values2 = np.unique(pred_p)
             im1=ax[-2].imshow(y_p, origin='lower', cmap = ListedColormap(list_cmap[l_values1]))
             im2=ax[-1].imshow(pred_p, origin='lower', cmap = ListedColormap(list_cmap[l_values2]))
+            ax[-2].set_title('{}'.format(l_values1))
+            ax[-1].set_title('{}'.format(l_values2))
 
             colors = [list_cmap[value] for value in values]
             patches = [mpatches.Patch(color=colors[i], 
