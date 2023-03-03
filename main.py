@@ -76,7 +76,7 @@ if __name__ == '__main__':
     #utils.test_centers(mask, c[:,0], c[:,1])
 
     ##Train a model using a config file 
-    train.run(save_config=True, bilinear=False) # Unet upsampling mechanisim is Traspose convolution
+    #train.run(save_config=True, bilinear=False) # Unet upsampling mechanisim is Traspose convolution
 
     #Test model
     #Initial summary
@@ -142,13 +142,13 @@ if __name__ == '__main__':
     #utils.test_Imax(imax_save, model_test1, bin_classes)
    
     #Training information
-    #with open ('../Tests/model_params_251122_test3/Train_params_11_25_2022_09_09_51.npy', 'rb') as f:
-    #    metrics = np.load(f, allow_pickle=True)
+    with open ('../Tests/Train_params_11_30_2022_05_33_30.npy', 'rb') as f:
+        metrics = np.load(f, allow_pickle=True)
     #    h_train_metrics = np.load(f, allow_pickle=True)
     #    h_val_metrics = np.load(f, allow_pickle=True)
 ####
     #print(training_info)
-    #utils.metrics_plots(metrics, Title='Test 3: Focal Loss $\gamma = 10$')
+    utils.metrics_plots(metrics, Title='Test 7: mIoU')
     #utils.metrics_plots(metrics, Title='Test 2: Mean Intersection-over-Union (mIoU)')
 ##
     #h_lt=[]
