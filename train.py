@@ -19,7 +19,7 @@ device = cfg.device
 def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
          BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, dropout = cfg.dropout, save_config=False, bilinear=False):
 
-    CE_weights = torch.Tensor([1.0,10.0,10.0,10.0,1.0]).to(device)
+    CE_weights = torch.Tensor([1.0,1.0,10.0]).to(device)
 
     if loss_str == 'CrossEntropy':
         criterion = nn.CrossEntropyLoss(weight=CE_weights).to(device)
@@ -30,9 +30,9 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
 
     test_num = int(0.1 * l)
     print("Training set")
-    data_train=dataset.segDataset(root+'Train/', l=l-test_num, s=size_boxes, seq_len=seq_len)
+    data_train=dataset.segDataset(root, l=l-test_num, s=size_boxes, seq_len=seq_len)
     print("Validating set")
-    data_test=dataset.segDataset_val(root+'Train/', l=test_num, s=size_boxes, seq_len=seq_len)
+    data_test=dataset.segDataset_val(root, l=test_num, s=size_boxes, seq_len=seq_len)
     
     train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=True, num_workers=1, drop_last=True)
     test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=False, num_workers=1, drop_last=True)
