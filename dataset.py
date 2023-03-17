@@ -14,6 +14,7 @@ import torch.nn.functional as F
 import sys
 import PIL
 from einops import repeat, rearrange
+import h5py
 
 #For run 20 GBt memory free
 
@@ -206,12 +207,17 @@ class Secuential_trasn(torch.nn.Module):
       return t_list[-1], c
 
 class segDataset(torch.utils.data.Dataset):
-  def __init__(self, root, l=1000, s=96, channels=4, seq_len=4):
+  def __init__(self, file, type, l=1000, s=96, channels=4, seq_len=4):
+    """
+    File - hdf5
+    Type: 1) T for training or V for validating
+    """
     super(segDataset, self).__init__()
-    self.root = root
+    self.file = file
     self.size = s
     self.l = l
     self.channels = channels
+    self.type = type
 
     self.seq_len = seq_len
     self.classes = {'Intergranular lane' : 0,
@@ -220,210 +226,75 @@ class segDataset(torch.utils.data.Dataset):
 
     self.bin_classes = ['Intergranular lane', 'Granule', 'Exploding granule']
 
-    self.transform_serie = Secuential_trasn([Ttorch.ToTensor(),
+    self.transform_serie_t = Secuential_trasn([Ttorch.ToTensor(),
                                             SRS_crop(self.size),
                                             RotationTransform(angles=[0, 90, 180, 270]),
                                             Ttorch.RandomHorizontalFlip(p=0.5),
                                             Ttorch.RandomVerticalFlip(p=0.5)
                                             ])
-    
-    print("Reading files...")
-    
-    self.file_list = sorted(glob(self.root+'*.npz'))
-    
-    self.ts_smap = []
-    self.mask_smap = []
-    self.weight_maps = []
-    self.index_list = []
-    
-    for f in self.file_list:
-      if "training" in f:
-        file = np.load(f)
-        raw_cube = file['raw'].astype(np.float32)
-        mask_cube = file['segmented'].astype(np.float32)
-        weight_cube = file['weights'].astype(np.float32)
 
-        self.size_cube = mask_cube.shape
-        pad_value = int(((np.sqrt(2*(self.size_cube[-1]**2))-self.size_cube[-1]))/2)
-
-        self.rot_angle = np.arange(0,90,45)
-        for a in self.rot_angle:
-          #print(a)
-          start = time.time()
-          for t in range(self.size_cube[0]):
-            #Padding for rotation
-            #Original maps - channels (Cont, vlos, LP, CP)
-            pad_map = np.array([np.pad(raw_cube[t,c,:,:], ((pad_value,pad_value),(pad_value,pad_value)), mode='reflect') for c in range(self.channels)])
-            #Segmentated maps
-            pad_mmap = np.pad(mask_cube[t,:,:], ((pad_value,pad_value),(pad_value,pad_value)), mode='reflect')
-            #Weigted maps
-            pad_wmap = np.pad(weight_cube[t,:,:], ((pad_value,pad_value),(pad_value,pad_value)), mode='reflect')
-            
-            #Original image rotation
-            c_maps=[]
-            for c in range(self.channels):
-              img = pad_map[c]
-              rot_img = rotate_CV(img,a)
-              x01 = int(abs(rot_img.shape[0]/2) - (self.size_cube[-1]/2))
-              x02 = int(abs(rot_img.shape[0]/2) + (self.size_cube[-1]/2))
-              c_maps.append(rot_img[x01:x02,x01:x02])
-            
-            #Segmented map rotation
-            img_seg = pad_mmap
-            rot_img_seg = rotate_CV(img_seg,a)
-            x01 = int(abs(rot_img_seg.shape[0]/2) - (self.size_cube[-1]/2))
-            x02 = int(abs(rot_img_seg.shape[0]/2) + (self.size_cube[-1]/2))
-            s_map = rot_img_seg[x01:x02,x01:x02]
-
-            #Weighted map rotation
-            img_wei = pad_wmap
-            rot_img_wei = rotate_CV(img_wei,a)
-            x01 = int(abs(rot_img_wei.shape[0]/2) - (self.size_cube[-1]/2))
-            x02 = int(abs(rot_img_wei.shape[0]/2) + (self.size_cube[-1]/2))
-            w_map = rot_img_wei[x01:x02,x01:x02]
-
-            #Sigue estando aqui
-            w_map_cut = w_map[int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)]
-            wm_blurred = gaussian_filter(w_map_cut, sigma=14)
-                  
-            self.ts_smap.append(c_maps)
-            self.mask_smap.append(s_map)
-
-            self.weight_maps.append(softmax(wm_blurred.flatten()))
-            self.index_list.append(np.array(list(np.ndindex(w_map_cut.shape))))
-
-          #print(time.time() - start)
-    del file
-    del raw_cube
-    del mask_cube
-    del weight_cube
-    print("Done!")
-        
-  def __getitem__(self, idx):
-    #Temporal jump adjustment
-    #r = len(self.rot_angle)
-    #x1 = np.concatenate(np.array([np.arange(4,36,1,dtype=np.int16)+i*100 for i in range(r)]))
-    #x2 = np.concatenate(np.array([np.arange(46,96,1,dtype=np.int16)+i*100 for i in range(r)]))
-    #x = np.concatenate((x1,x2))
-    #Use the frames with exploding granules detection
-    x = np.array([4,8,11,19,26,28,34,35,33,36,50,58,56,63,68,83,78,87,90])
-    ind = np.random.randint(low=0, high=len(x))
-    val_ind = x[ind]
-
-    ind_list = np.arange(val_ind-self.seq_len,val_ind+self.seq_len+1,1, dtype=np.int8)
-    
-    seq_smap=[]
-    for st in ind_list:
-      seq_smap.append(self.ts_smap[st])
-
-    seq_smap = np.array(seq_smap)
-    mask_smap = self.mask_smap[val_ind]
-    c_mask_smap = repeat(mask_smap, 'h w -> 1 '+str(self.channels)+' h w')     
-    to_trans_map = np.concatenate((seq_smap, c_mask_smap))
-    to_trans_map_arrange = rearrange(to_trans_map, 's c h w -> (s c) h w')
-    #(1 channels h w) -> (10,channels,796,796)
-    # 10 + channels -> ((10 channels) h w)
-    weight_map = self.weight_maps[val_ind]
-    index_l = self.index_list[val_ind]
-
-    img_t, c = self.transform_serie(np.array(to_trans_map_arrange).transpose(), weight_map, index_l)
-
-    img_t_rearange = rearrange(img_t, '(s c) h w -> s c h w', c=self.channels)
-
-    self.images = img_t_rearange[0:-1]
-    self.mask = img_t_rearange[-1].type(torch.int64)[0]
-    #return self.image, self.mask, ind, c  #for test central points
-    return self.images, self.mask
-  
-  def __len__(self):
-        return self.l
-
-class segDataset_val(torch.utils.data.Dataset):
-  def __init__(self, root, l=1000, s=96, channels=4, seq_len=4):
-    super(segDataset_val, self).__init__()
-    start = time.time()
-    self.root = root
-    self.size = s
-    self.l = l
-    self.channels = channels
-
-    self.seq_len = seq_len
-    self.classes = {'Intergranular lane' : 0,
-                    'Granule': 1,
-                    'Exploding granule' : 2}
-
-    self.bin_classes = ['Intergranular lane', 'Granule', 'Exploding granule']
-
-    self.transform_serie = Secuential_trasn([Ttorch.ToTensor(),
+    self.transform_serie_v = Secuential_trasn([Ttorch.ToTensor(),
                                             SRS_crop(self.size),
                                             Ttorch.RandomHorizontalFlip(p=0.5),
                                             Ttorch.RandomVerticalFlip(p=0.5)
                                             ])
     
-    print("Reading files...")
-    
-    self.file_list = sorted(glob(self.root+'*.npz'))
-    
-    self.ts_smap = []
-    self.mask_smap = []
-    self.weight_maps = []
-    self.index_list = []
-    
-    for f in self.file_list:
-        #print(f)
-        if "validation" in f:
-            file = np.load(f)
-            raw_cube = file['raw'].astype(np.float32)
-            mask_cube = file['segmented'].astype(np.float32)
-            weight_cube = file['weights'].astype(np.float32)
+    print("Reading file...")
 
-            self.size_cube = mask_cube.shape
+    self.keys = ['Training', 'Validating']
+    for indx, i in enumerate(self.keys):
+      if self.type == i[0]:
+        self.group = i
+        self.subg_ang = ['00','25','50','75']
 
-            for t in range(self.size_cube[0]):
-                self.ts_smap.append([raw_cube[t,c,:,:] for c in range(self.channels)])
-                self.mask_smap.append(mask_cube[t,:,:])
-                w_map = weight_cube[t,:,:]
-                wm_blurred = gaussian_filter(w_map, sigma=14)
-                self.weight_maps.append(softmax(wm_blurred.flatten()))
-                self.index_list.append(np.array(list(np.ndindex(w_map.shape))))
-
-    del file
-    del raw_cube
-    del mask_cube
-    del weight_cube
+    self._hdf5_file = None
+    #self.hdf5_file = h5py.File(self.file, 'r')
+    
     print("Done!")
+  
+  @property
+  def hdf5_file(self):
+      if self._hdf5_file is None: # lazy loading here!
+          self._hdf5_file = h5py.File(self.file, 'r')
+      return self._hdf5_file
         
   def __getitem__(self, idx):
     #Use the frames with exploding granules detection
-    x = np.array([5,10,10,24,26,27,33,34])
+    #dataset entries 6 -> C,Vlos,LP,CP,mask,weight
+    r_ang_ind = np.random.randint(low=0, high=len(self.subg_ang))
+    ang = self.subg_ang[r_ang_ind]
+    if self.type == 'T':
+      x = np.array([4,8,8,11,19,26,28,34,35,33,36,50,58,56,63,68,83,78,87,90])
+    elif self.type == 'V':
+      x = np.array([5,10,10,24,26,27,33,34])
     ind = np.random.randint(low=0, high=len(x))
     val_ind = x[ind]
-
     ind_list = np.arange(val_ind-self.seq_len,val_ind+self.seq_len+1,1, dtype=np.int8)
     
-    seq_smap=[]
-    for st in ind_list:
-      seq_smap.append(self.ts_smap[st])
-
-    seq_smap = np.array(seq_smap)
-    mask_smap = self.mask_smap[val_ind]
-    c_mask_smap = repeat(mask_smap, 'h w -> 1 '+str(self.channels)+' h w')     
-    to_trans_map = np.concatenate((seq_smap, c_mask_smap))
-    to_trans_map_arrange = rearrange(to_trans_map, 's c h w -> (s c) h w')
-    #(1 channels h w) -> (10,channels,796,796)
-    # 10 + channels -> ((10 channels) h w)
-    weight_map = self.weight_maps[val_ind]
-    index_l = self.index_list[val_ind]
-
-    img_t, c = self.transform_serie(np.array(to_trans_map_arrange).transpose(), weight_map, index_l)
-
-    img_t_rearange = rearrange(img_t, '(s c) h w -> s c h w', c=self.channels)
-
-    self.images = img_t_rearange[0:-1]
-    self.mask = img_t_rearange[-1].type(torch.int64)
-
-    #return self.image, self.mask, val_ind, c  #for test central points
+    trans_map=[]
+    for count, st in enumerate(ind_list):
+      ds = self.hdf5_file[self.group+'/'+ang+'/'+"{0:02}".format(st)]
+      trans_map.append(ds[:-1,:,:])
+      if count == self.seq_len:
+        wm_blurred = gaussian_filter(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)], sigma=6)
+        weight_map = softmax(wm_blurred.flatten())
+        index_l = np.array(list(np.ndindex(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)].shape)))
+#
+    #combine (s c) to transform
+    to_trans_map_arrange = rearrange(np.array(trans_map), 's c h w -> (s c) h w')
+    if self.type == 'T':
+      img_t, cent = self.transform_serie_t(to_trans_map_arrange.transpose(), weight_map, index_l)
+    elif self.type == 'V':
+      img_t, cent = self.transform_serie_v(to_trans_map_arrange.transpose(), weight_map, index_l)
+    else:
+      raise FileNotFoundError
+#
+    img_t_rearange = rearrange(img_t, '(s c) h w -> s c h w', c=self.channels+1) #Channels + mask
+#
+    self.images = img_t_rearange[:,0:-1,:,:]
+    self.mask = img_t_rearange[self.seq_len,-1,:,:].type(torch.int64)
+    #return self.image, self.mask, ind, c  #for test central points
     return self.images, self.mask
-  
+    
   def __len__(self):
         return self.l

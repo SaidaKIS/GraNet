@@ -16,7 +16,7 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
 device = cfg.device
 
-def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
+def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
          BACH_SIZE=cfg.batch, seq_len=cfg.seq_len, loss_str=cfg.loss, lr = cfg.lr, dropout = cfg.dropout, save_config=False, bilinear=False):
 
     CE_weights = torch.Tensor([1.0,1.0,10.0]).to(device)
@@ -30,12 +30,12 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
 
     test_num = int(0.1 * l)
     print("Training set")
-    data_train=dataset.segDataset(root, channels=channels, l=l-test_num, s=size_boxes, seq_len=seq_len)
+    data_train=dataset.segDataset(file, type='T', channels=channels, l=l-test_num, s=size_boxes, seq_len=seq_len)
     print("Validating set")
-    data_test=dataset.segDataset_val(root, channels=channels, l=test_num, s=size_boxes, seq_len=seq_len)
+    data_test=dataset.segDataset(file, type='V', channels=channels, l=test_num, s=size_boxes, seq_len=seq_len)
     
-    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=True, num_workers=1, drop_last=True)
-    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=False, num_workers=1, drop_last=True)
+    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=False, num_workers=4, drop_last=True)
+    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=True, num_workers=4, drop_last=True)
     
     n_class = len(data_train.bin_classes)
 
@@ -132,68 +132,7 @@ def run(root=cfg.root, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
                                                                                                         np.mean(acc_list), 
                                                                                                         np.mean(val_loss_list),
                                                                                                         np.mean(val_acc_list)))
-        if epoch % 10 == 0:
-            print("Partial Model")
-
-            save_h_train_losses.append([loss_list, acc_list])
-            save_h_val_losses.append([val_loss_list, val_acc_list])
-
-            torch.save(model_unet.state_dict(), 'model_params/unet_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
-
-            x_p = train_xypred[0][0]
-            y_p = train_xypred[0][1]
-            pred_p = train_xypred[0][2]
-
-            values = [0,1,2,3,4]
-            bin_classes = data_train.bin_classes
-
-            i_cmap=plt.get_cmap('PiYG', 5)
-            list_cmap = i_cmap(range(5))
-
-            fig, ax = plt.subplots(nrows=1, ncols=7, sharex=True, sharey=True)
-            fig.set_size_inches(15, 5)
-            for i in range(5):
-                im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-            l_values1 = np.unique(y_p)
-            l_values2 = np.unique(pred_p)
-            im1=ax[-2].imshow(y_p, origin='lower', cmap=ListedColormap(list_cmap[l_values1]))
-            im2=ax[-1].imshow(pred_p, origin='lower', cmap=ListedColormap(list_cmap[l_values2]))
-            ax[-2].set_title('{}'.format(l_values1))
-            ax[-1].set_title('{}'.format(l_values2))
-
-            colors = [list_cmap[value] for value in values]
-            patches = [mpatches.Patch(color=colors[i], 
-            label="{l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
-            lgd = plt.legend(handles=patches, bbox_to_anchor=(2.5, 0.75), loc=1, borderaxespad=0. , ncol=1)
-
-            fig.suptitle('Model_Train_Epoch_{}'.format(epoch))
-            plt.tight_layout()
-            plt.savefig("Train_epoch_{}.png".format(epoch), dpi=200, bbox_extra_artists=(lgd,), bbox_inches='tight')
-
-            x_p = test_xypred[0][0]
-            y_p = test_xypred[0][1]
-            pred_p = test_xypred[0][2]
-
-            fig, ax = plt.subplots(nrows=1, ncols=7, sharex=True, sharey=True)
-            fig.set_size_inches(15, 5)
-            for i in range(5):
-                im=ax[i].imshow(x_p[i,:,:], origin='lower', cmap='gray')
-            l_values1 = np.unique(y_p)
-            l_values2 = np.unique(pred_p)
-            im1=ax[-2].imshow(y_p, origin='lower', cmap = ListedColormap(list_cmap[l_values1]))
-            im2=ax[-1].imshow(pred_p, origin='lower', cmap = ListedColormap(list_cmap[l_values2]))
-            ax[-2].set_title('{}'.format(l_values1))
-            ax[-1].set_title('{}'.format(l_values2))
-
-            colors = [list_cmap[value] for value in values]
-            patches = [mpatches.Patch(color=colors[i], 
-            label="{l}".format(l=bin_classes[i])) for i in range(len(bin_classes))]
-            lgd = plt.legend(handles=patches, bbox_to_anchor=(2.5, 0.75), loc=1, borderaxespad=0. , ncol=1)
-
-            fig.suptitle('Model_test_Epoch_{}'.format(epoch))
-            plt.tight_layout()
-            plt.savefig("Test_epoch_{}.png".format(epoch), dpi=200, bbox_extra_artists=(lgd,), bbox_inches='tight')
-
+        
         save_losses.append([epoch, np.mean(loss_list), np.mean(acc_list), np.mean(val_loss_list),  np.mean(val_acc_list),
                             np.mean(val_overall_pa_list), np.mean(val_per_class_pa_list),
                             np.mean(val_jaccard_index_list), np.mean(val_dice_index_list)])
