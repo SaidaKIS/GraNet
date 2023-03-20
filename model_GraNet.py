@@ -308,6 +308,6 @@ class GraNet(nn.Module):
 
         x = rearrange(x,'(B S) C H W -> B S C H W', B=self.batch)
 
-        logits = x[:,self.n_seq//2+1,:,:,:]
+        logits = x[:,self.n_seq//2,:,:,:]
 
         return logits

@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 
-
 device = cfg.device
 
 def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCHS=cfg.N_EPOCHS,
@@ -34,8 +33,8 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     print("Validating set")
     data_test=dataset.segDataset(file, type='V', channels=channels, l=test_num, s=size_boxes, seq_len=seq_len)
     
-    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=False, num_workers=4, drop_last=True)
-    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=True, num_workers=4, drop_last=True)
+    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=False, num_workers=20, drop_last=True)
+    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=True, num_workers=20, drop_last=True)
     
     n_class = len(data_train.bin_classes)
 
@@ -52,6 +51,9 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     #Histograms
     save_h_train_losses = []
     save_h_val_losses = []
+    train_xypred = []
+    test_xypred = []
+
     scheduler_counter = 0
 
     for epoch in range(N_EPOCHS):
@@ -59,8 +61,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
         model_unet.train()
         loss_list = []
         acc_list = []
-
-        train_xypred = []
 
         for batch_i, (x, y) in enumerate(train_dataloader):
             optimizer.zero_grad()
@@ -86,11 +86,11 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             )
             #Evaluation of the training results
             pred_mask_class = torch.argmax(pred_mask, axis=1)
-            if batch_i == len(train_dataloader) - 1:
+            if batch_i % 5:
                 x_p = x.cpu().detach().numpy()
                 y_p = y.cpu().detach().numpy()
                 pred_p = pred_mask_class.cpu().detach().numpy()
-                train_xypred.append([x_p[-1,0,:,:,:], y_p[-1], pred_p[-1]])
+                train_xypred.append([x_p[-1,:,:,:,:], y_p[-1], pred_p[-1]])
 
         scheduler_counter += 1
     
@@ -103,8 +103,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
         val_jaccard_index_list = []
         val_dice_index_list = []
 
-        test_xypred = []
-
         for batch_i, (x, y) in enumerate(test_dataloader):
 
             with torch.no_grad():    
@@ -113,11 +111,11 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             pred_mask_class = torch.argmax(pred_mask, axis=1)
 
             #Evaluation of the testing results
-            if batch_i == len(test_dataloader) - 1:
+            if batch_i % 5:
                 x_p = x.cpu().detach().numpy()
                 y_p = y.cpu().detach().numpy()
                 pred_p = pred_mask_class.cpu().detach().numpy()
-                test_xypred.append([x_p[-1,0,:,:,:], y_p[-1], pred_p[-1]])
+                test_xypred.append([x_p[-1,:,:,:,:], y_p[-1], pred_p[-1]])
 
             val_overall_pa, val_per_class_pa, val_jaccard_index, val_dice_index, pc_opa, pc_j, pc_d = utils.eval_metrics_sem(y.to(device), pred_mask_class.to(device), n_class, device)
             val_overall_pa_list.append(val_overall_pa.cpu().detach().numpy())
@@ -133,6 +131,9 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
                                                                                                         np.mean(val_loss_list),
                                                                                                         np.mean(val_acc_list)))
         
+        save_h_train_losses.append([loss_list, acc_list])
+        save_h_val_losses.append([val_loss_list, val_acc_list])
+
         save_losses.append([epoch, np.mean(loss_list), np.mean(acc_list), np.mean(val_loss_list),  np.mean(val_acc_list),
                             np.mean(val_overall_pa_list), np.mean(val_per_class_pa_list),
                             np.mean(val_jaccard_index_list), np.mean(val_dice_index_list)])
@@ -164,6 +165,9 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             np.save(f, save_losses)
             np.save(f, save_h_train_losses)
             np.save(f, save_h_val_losses)
+        with open('model_params/Train_results_{}.npy'.format(stdt), 'wb') as f:
+            np.save(f, train_xypred)
+            np.save(f, test_xypred)
         with open('model_params/Train_params_{}.txt'.format(stdt), 'wb') as f:
             for key, value in cfg.items():
                 line = str(key) + " : "+str(value)+"\n"

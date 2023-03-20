@@ -142,13 +142,13 @@ if __name__ == '__main__':
     #utils.test_Imax(imax_save, model_test1, bin_classes)
    
     #Training information
-    #with open ('../Tests/Train_params_11_30_2022_05_33_30.npy', 'rb') as f:
+    #with open ('../Tests/model_params_200323_test1/Train_params_03_19_2023_05_01_22.npy', 'rb') as f:
     #    metrics = np.load(f, allow_pickle=True)
     #    h_train_metrics = np.load(f, allow_pickle=True)
     #    h_val_metrics = np.load(f, allow_pickle=True)
 ####
     #print(training_info)
-    #utils.metrics_plots(metrics, Title='Test 7: mIoU')
+    #utils.metrics_plots(metrics, Title='Test 8: mIoU')
     #utils.metrics_plots(metrics, Title='Test 2: Mean Intersection-over-Union (mIoU)')
 ##
     #h_lt=[]

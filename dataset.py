@@ -228,7 +228,7 @@ class segDataset(torch.utils.data.Dataset):
 
     self.transform_serie_t = Secuential_trasn([Ttorch.ToTensor(),
                                             SRS_crop(self.size),
-                                            RotationTransform(angles=[0, 90, 180, 270]),
+                                            #RotationTransform(angles=[0, 90, 180, 270]),
                                             Ttorch.RandomHorizontalFlip(p=0.5),
                                             Ttorch.RandomVerticalFlip(p=0.5)
                                             ])
@@ -274,8 +274,10 @@ class segDataset(torch.utils.data.Dataset):
     trans_map=[]
     for count, st in enumerate(ind_list):
       ds = self.hdf5_file[self.group+'/'+ang+'/'+"{0:02}".format(st)]
-      trans_map.append(ds[:-1,:,:])
-      if count == self.seq_len:
+      for ca in range(self.channels):
+        trans_map.append(ds[ca,:,:]) #channels
+      trans_map.append(ds[-2,:,:]) #mask
+      if count == self.seq_len: # weigth
         wm_blurred = gaussian_filter(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)], sigma=6)
         weight_map = softmax(wm_blurred.flatten())
         index_l = np.array(list(np.ndindex(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)].shape)))
