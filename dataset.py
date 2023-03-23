@@ -264,9 +264,12 @@ class segDataset(torch.utils.data.Dataset):
     r_ang_ind = np.random.randint(low=0, high=len(self.subg_ang))
     ang = self.subg_ang[r_ang_ind]
     if self.type == 'T':
-      x = np.array([4,8,8,11,19,26,28,34,35,33,36,50,58,56,63,68,83,78,87,90])
+      #x = np.array([4,8,8,11,19,26,28,34,35,33,36,50,58,56,63,68,83,78,87,90] #complete dataset
+      x = np.array([4,8,8,11,19,26,28] #small dataset
     elif self.type == 'V':
-      x = np.array([5,10,10,24,26,27,33,34])
+      #x = np.array([5,10,10,24,26,27,33,34] #complete dataset
+      x = np.array([0,6,8]) #small dataset
+                   
     ind = np.random.randint(low=0, high=len(x))
     val_ind = x[ind]
     ind_list = np.arange(val_ind-self.seq_len,val_ind+self.seq_len+1,1, dtype=np.int8)
