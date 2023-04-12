@@ -193,36 +193,28 @@ class GraNet(nn.Module):
         self.down1 = Down(n_hidden, 2*n_hidden, dropout=self.dropout)
         self.down2 = Down(2*n_hidden, 4*n_hidden, dropout=self.dropout)
         self.down3 = Down(4*n_hidden, 8*n_hidden, dropout=self.dropout)
-        self.down4 = Down(8*n_hidden, 16*n_hidden, dropout=self.dropout)
-
-        self.LSTM1 = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
-        self.LSTM1_inv = ConvLSTM(input_channel=16*n_hidden, num_filter=16*n_hidden, b_h_w=(self.batch, h // 16, w // 16))
+        
+        self.LSTM1 = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
+        self.LSTM1_inv = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
         self.conv1 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
-        self.att1 = AttentionBlock(8*n_hidden,16*n_hidden,int(8*n_hidden))
-        self.up1 = Up(16*n_hidden,8*n_hidden, bilinear=bilinear, dropout=self.dropout)
+        self.att1 = AttentionBlock(4*n_hidden,8*n_hidden,int(4*n_hidden))
+        self.up1 = Up(8*n_hidden,4*n_hidden, bilinear=bilinear, dropout=self.dropout)
     
-        self.LSTM2 = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
-        self.LSTM2_inv = ConvLSTM(input_channel=8*n_hidden, num_filter=8*n_hidden, b_h_w=(self.batch, h // 8, w // 8))
+        self.LSTM2 = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
+        self.LSTM2_inv = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
         self.conv2 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
-        self.att2 = AttentionBlock(4*n_hidden,8*n_hidden,int(4*n_hidden))
-        self.up2 = Up(8*n_hidden,4*n_hidden, bilinear=bilinear, dropout=self.dropout)
+        self.att2 = AttentionBlock(2*n_hidden,4*n_hidden,int(2*n_hidden))
+        self.up2 = Up(4*n_hidden,2*n_hidden, bilinear=bilinear, dropout=self.dropout)
 
-        self.LSTM3 = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
-        self.LSTM3_inv = ConvLSTM(input_channel=4*n_hidden, num_filter=4*n_hidden, b_h_w=(self.batch, h // 4, w // 4))
+        self.LSTM3 = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
+        self.LSTM3_inv = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
         self.conv3 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
-        self.att3 = AttentionBlock(2*n_hidden,4*n_hidden,int(2*n_hidden))
-        self.up3 = Up(4*n_hidden,2*n_hidden, bilinear=bilinear, dropout=self.dropout)
-
-        self.LSTM4 = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
-        self.LSTM4_inv = ConvLSTM(input_channel=2*n_hidden, num_filter=2*n_hidden, b_h_w=(self.batch, h // 2, w // 2))
-        self.conv4 = inconv(self.n_seq*2,self.n_seq, dropout=self.dropout)
-        self.att4 = AttentionBlock(n_hidden,2*n_hidden,n_hidden)
-        self.up4 = Up(2*n_hidden,n_hidden, bilinear=bilinear, dropout=self.dropout)
+        self.att3 = AttentionBlock(n_hidden,2*n_hidden,int(n_hidden))
+        self.up3 = Up(2*n_hidden,n_hidden, bilinear=bilinear, dropout=self.dropout)
 
         self.outc = OutConv(n_hidden, n_classes)
 
     def forward(self, x):
-
         #x = x[:,:,np.newaxis,:,:]
         #x = rearrange(x,'B C S H W -> B S C H W')
         x = rearrange(x,'B S C H W -> (B S) C H W')
@@ -230,80 +222,55 @@ class GraNet(nn.Module):
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)
-        x5 = self.down4(x4)
 
-        x5 = rearrange(x5,'(B S) C H W -> B S C H W', B=self.batch)
-        x5 = rearrange(x5,'B S C H W -> S B C H W')
-        x5LSTM = self.LSTM1(inputs=x5, states=None)[0]
-        x5_inv = torch.flip(x5,[0])
-        x5_inv_LSTM = self.LSTM1_inv(inputs=x5_inv, states=None)[0]
-        x5_inv_LSTM = torch.flip(x5_inv_LSTM,[0])
-        x5_LSTM_glob = torch.cat((x5LSTM,x5_inv_LSTM))
-        x5_LSTM_glob = rearrange(x5_LSTM_glob,'S B C H W -> B C S H W')
-        x5_LSTM_glob = rearrange(x5_LSTM_glob,'B C S H W -> (B C) S H W')
-        x5LSTM = self.conv1(x5_LSTM_glob)
-        x5LSTM = rearrange(x5LSTM,'(B C) S H W -> B C S H W', B=self.batch)
-        x5LSTM = rearrange(x5LSTM,'B C S H W -> B S C H W')
-        x5LSTM = rearrange(x5LSTM,'B S C H W -> (B S) C H W')
-
-        att1x5 = self.att1(x4,x5LSTM)
-
-        upx5 = self.up1(x5LSTM,att1x5)
-
-        upx5 = rearrange(upx5,'(B S) C H W -> B S C H W', B=self.batch)
-        upx5 = rearrange(upx5,'B S C H W -> S B C H W')
-        x4LSTM = self.LSTM2(inputs=upx5, states=None)[0]
-        upx5_inv = torch.flip(upx5,[0])
-        upx5_inv_LSTM = self.LSTM2_inv(inputs=upx5_inv, states=None)[0]
-        upx5_inv_LSTM = torch.flip(upx5_inv_LSTM,[0])
-        x4_LSTM_glob = torch.cat((x4LSTM,upx5_inv_LSTM))      
+        x4 = rearrange(x4,'(B S) C H W -> B S C H W', B=self.batch)
+        x4 = rearrange(x4,'B S C H W -> S B C H W')
+        x4LSTM = self.LSTM1(inputs=x4, states=None)[0]
+        x4_inv = torch.flip(x4,[0])
+        x4_inv_LSTM = self.LSTM1_inv(inputs=x4_inv, states=None)[0]
+        x4_inv_LSTM = torch.flip(x4_inv_LSTM,[0])
+        x4_LSTM_glob = torch.cat((x4LSTM,x4_inv_LSTM))
         x4_LSTM_glob = rearrange(x4_LSTM_glob,'S B C H W -> B C S H W')
         x4_LSTM_glob = rearrange(x4_LSTM_glob,'B C S H W -> (B C) S H W')
-        x4LSTM = self.conv2(x4_LSTM_glob)
-        x4LSTM = rearrange(x4LSTM,'(B C) S H W -> B C S H W',B=self.batch)
-        x4LSTM = rearrange(x4LSTM,'B C S H W -> B S C H W',B=self.batch)
+        x4LSTM = self.conv1(x4_LSTM_glob)
+        x4LSTM = rearrange(x4LSTM,'(B C) S H W -> B C S H W', B=self.batch)
+        x4LSTM = rearrange(x4LSTM,'B C S H W -> B S C H W')
         x4LSTM = rearrange(x4LSTM,'B S C H W -> (B S) C H W')
+        att1x4 = self.att1(x3,x4LSTM)
+        upx4 = self.up1(x4LSTM,att1x4)
 
-        att2x4 = self.att2(x3,x4LSTM)
-
-        upx4 = self.up2(x4LSTM,att2x4)
-        
-        upx4 = rearrange(upx4,'(B S) C H W -> B S C H W',B=self.batch)
+        upx4 = rearrange(upx4,'(B S) C H W -> B S C H W', B=self.batch)
         upx4 = rearrange(upx4,'B S C H W -> S B C H W')
-        x3LSTM = self.LSTM3(inputs=upx4, states=None)[0]
+        x3LSTM = self.LSTM2(inputs=upx4, states=None)[0]
         upx4_inv = torch.flip(upx4,[0])
-        upx4_inv_LSTM = self.LSTM3_inv(inputs=upx4_inv, states=None)[0]
+        upx4_inv_LSTM = self.LSTM2_inv(inputs=upx4_inv, states=None)[0]
         upx4_inv_LSTM = torch.flip(upx4_inv_LSTM,[0])
-        x3_LSTM_glob = torch.cat((x3LSTM,upx4_inv_LSTM))
+        x3_LSTM_glob = torch.cat((x3LSTM,upx4_inv_LSTM))      
         x3_LSTM_glob = rearrange(x3_LSTM_glob,'S B C H W -> B C S H W')
         x3_LSTM_glob = rearrange(x3_LSTM_glob,'B C S H W -> (B C) S H W')
-        x3LSTM = self.conv3(x3_LSTM_glob)
+        x3LSTM = self.conv2(x3_LSTM_glob)
         x3LSTM = rearrange(x3LSTM,'(B C) S H W -> B C S H W',B=self.batch)
-        x3LSTM = rearrange(x3LSTM,'B C S H W -> B S C H W')
+        x3LSTM = rearrange(x3LSTM,'B C S H W -> B S C H W',B=self.batch)
         x3LSTM = rearrange(x3LSTM,'B S C H W -> (B S) C H W')
-
-        att3x3 = self.att3(x2,x3LSTM)
-        
-        upx3 = self.up3(x3LSTM,att3x3)
+        att2x3 = self.att2(x2,x3LSTM)
+        upx3 = self.up2(x3LSTM,att2x3)
         
         upx3 = rearrange(upx3,'(B S) C H W -> B S C H W',B=self.batch)
         upx3 = rearrange(upx3,'B S C H W -> S B C H W')
-        x2LSTM = self.LSTM4(inputs=upx3, states=None)[0]
+        x2LSTM = self.LSTM3(inputs=upx3, states=None)[0]
         upx3_inv = torch.flip(upx3,[0])
-        upx3_inv_LSTM = self.LSTM4_inv(inputs=upx3_inv, states=None)[0]
+        upx3_inv_LSTM = self.LSTM3_inv(inputs=upx3_inv, states=None)[0]
         upx3_inv_LSTM = torch.flip(upx3_inv_LSTM,[0])
         x2_LSTM_glob = torch.cat((x2LSTM,upx3_inv_LSTM))
         x2_LSTM_glob = rearrange(x2_LSTM_glob,'S B C H W -> B C S H W')
         x2_LSTM_glob = rearrange(x2_LSTM_glob,'B C S H W -> (B C) S H W')
-        x2LSTM = self.conv4(x2_LSTM_glob) 
+        x2LSTM = self.conv3(x2_LSTM_glob)
         x2LSTM = rearrange(x2LSTM,'(B C) S H W -> B C S H W',B=self.batch)
-        x2LSTM = rearrange(x2LSTM,'B C S H W -> B S C H W') 
+        x2LSTM = rearrange(x2LSTM,'B C S H W -> B S C H W')
         x2LSTM = rearrange(x2LSTM,'B S C H W -> (B S) C H W')
-
-        att4x2 = self.att4(x1,x2LSTM)
-        
-        upx2 = self.up4(x2LSTM,att4x2)
-
+        att3x2 = self.att3(x1,x2LSTM)
+        upx2 = self.up3(x2LSTM,att3x2)
+    
         x = self.outc(upx2)
 
         x = rearrange(x,'(B S) C H W -> B S C H W', B=self.batch)

@@ -226,19 +226,12 @@ class segDataset(torch.utils.data.Dataset):
 
     self.bin_classes = ['Intergranular lane', 'Granule', 'Exploding granule']
 
-    self.transform_serie_t = Secuential_trasn([Ttorch.ToTensor(),
+    self.transform_serie = Secuential_trasn([Ttorch.ToTensor(),
                                             SRS_crop(self.size),
-                                            #RotationTransform(angles=[0, 90, 180, 270]),
                                             Ttorch.RandomHorizontalFlip(p=0.5),
                                             Ttorch.RandomVerticalFlip(p=0.5)
                                             ])
 
-    self.transform_serie_v = Secuential_trasn([Ttorch.ToTensor(),
-                                            SRS_crop(self.size),
-                                            Ttorch.RandomHorizontalFlip(p=0.5),
-                                            Ttorch.RandomVerticalFlip(p=0.5)
-                                            ])
-    
     print("Reading file...")
 
     self.keys = ['Training', 'Validating']
@@ -264,9 +257,9 @@ class segDataset(torch.utils.data.Dataset):
     r_ang_ind = np.random.randint(low=0, high=len(self.subg_ang))
     ang = self.subg_ang[r_ang_ind]
     if self.type == 'T':
-      x = np.array([4,8,8,11,19,26,28,34,35,33,36,50,58,56,63,68,83,78,87,90])
+      x = np.array([4,8,8,11,19,26,28])
     elif self.type == 'V':
-      x = np.array([5,10,10,24,26,27,33,34])
+      x = np.array([0,6,8])
     ind = np.random.randint(low=0, high=len(x))
     val_ind = x[ind]
     ind_list = np.arange(val_ind-self.seq_len,val_ind+self.seq_len+1,1, dtype=np.int8)
@@ -274,10 +267,8 @@ class segDataset(torch.utils.data.Dataset):
     trans_map=[]
     for count, st in enumerate(ind_list):
       ds = self.hdf5_file[self.group+'/'+ang+'/'+"{0:02}".format(st)]
-      for ca in range(self.channels):
-        trans_map.append(ds[ca,:,:]) #channels
-      trans_map.append(ds[-2,:,:]) #mask
-      if count == self.seq_len: # weigth
+      trans_map.append(ds[:-1,:,:])
+      if count == self.seq_len:
         wm_blurred = gaussian_filter(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)], sigma=6)
         weight_map = softmax(wm_blurred.flatten())
         index_l = np.array(list(np.ndindex(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)].shape)))
@@ -285,9 +276,9 @@ class segDataset(torch.utils.data.Dataset):
     #combine (s c) to transform
     to_trans_map_arrange = rearrange(np.array(trans_map), 's c h w -> (s c) h w')
     if self.type == 'T':
-      img_t, cent = self.transform_serie_t(to_trans_map_arrange.transpose(), weight_map, index_l)
+      img_t, cent = self.transform_serie(to_trans_map_arrange.transpose(), weight_map, index_l)
     elif self.type == 'V':
-      img_t, cent = self.transform_serie_v(to_trans_map_arrange.transpose(), weight_map, index_l)
+      img_t, cent = self.transform_serie(to_trans_map_arrange.transpose(), weight_map, index_l)
     else:
       raise FileNotFoundError
 #
@@ -297,6 +288,91 @@ class segDataset(torch.utils.data.Dataset):
     self.mask = img_t_rearange[self.seq_len,-1,:,:].type(torch.int64)
     #return self.image, self.mask, ind, c  #for test central points
     return self.images, self.mask
+   
     
+  def __len__(self):
+        return self.l
+
+class segDataset_SingleUnet(torch.utils.data.Dataset):
+  def __init__(self, file, type, l=1000, s=96, channels=1):
+    """
+    File - hdf5
+    Type: 1) T for training or V for validating
+    Maximum number of channels: 4
+    """
+    super(segDataset_SingleUnet, self).__init__()
+    self.file = file
+    self.size = s
+    self.l = l
+    self.channels = channels
+    self.type = type
+
+    self.classes = {'Intergranular lane' : 0,
+                    'Granule': 1,
+                    'Exploding granule' : 2}
+
+    self.bin_classes = ['Intergranular lane', 'Granule', 'Exploding granule']
+
+    self.transform_serie = Secuential_trasn([Ttorch.ToTensor(),
+                                            SRS_crop(self.size),
+                                            Ttorch.RandomHorizontalFlip(p=0.5),
+                                            Ttorch.RandomVerticalFlip(p=0.5)
+                                            ])
+
+    print("Reading file...")
+
+    self.keys = ['Training', 'Validating']
+    for indx, i in enumerate(self.keys):
+      if self.type == i[0]:
+        self.group = i
+        self.subg_ang = ['00','25','50','75']
+
+    self._hdf5_file = None
+    
+    print("Done!")
+  
+  @property
+  def hdf5_file(self):
+      if self._hdf5_file is None: # lazy loading here!
+          self._hdf5_file = h5py.File(self.file, 'r')
+      return self._hdf5_file
+        
+  def __getitem__(self, idx):
+    #Use the frames with exploding granules detection
+    #dataset entries 6 -> C,Vlos,LP,CP,mask,weight
+    r_ang_ind = np.random.randint(low=0, high=len(self.subg_ang))
+    ang = self.subg_ang[r_ang_ind]
+    if self.type == 'T':
+      x = np.array([0,2,4,8,8,11,19,26,28,34,35,33,38,39,36,50,58,56,63,68,83,78,87,90])
+    elif self.type == 'V':
+      x = np.array([4,9,9,23,25,26])
+    ind = np.random.randint(low=0, high=len(x))
+    val_ind = x[ind]
+    
+    #combine (s c) to transform
+    if self.type == 'T':
+      ds = self.hdf5_file[self.group+'/'+ang+'/'+"{0:02}".format(val_ind)]
+      trans_map = ds[:-1,:,:]
+      wm_blurred = gaussian_filter(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)], sigma=6)
+      weight_map = softmax(wm_blurred.flatten())
+      index_l = np.array(list(np.ndindex(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)].shape)))
+      img_t, cent = self.transform_serie(trans_map.transpose(), weight_map, index_l)
+    elif self.type == 'V':
+      ds = self.hdf5_file[self.group+'/'+self.subg_ang[0]+'/'+"{0:02}".format(val_ind)]
+      trans_map = ds[:-1,:,:]
+      wm_blurred = gaussian_filter(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)], sigma=6)
+      weight_map = softmax(wm_blurred.flatten())
+      index_l = np.array(list(np.ndindex(ds[-1,int(self.size/2):-int(self.size/2), int(self.size/2):-int(self.size/2)].shape)))
+      img_t, cent = self.transform_serie(trans_map.transpose(), weight_map, index_l)
+
+      img_t, cent = self.transform_serie(trans_map.transpose(), weight_map, index_l)
+    else:
+      raise FileNotFoundError
+    
+    self.images = img_t[0:self.channels,:,:]
+    self.mask = img_t[-1,:,:].type(torch.int64)
+    #return self.image, self.mask, ind, c  #for test central points
+    return self.images, self.mask
+   
   def __len__(self):
         return self.l

@@ -2,6 +2,7 @@ from collections import OrderedDict
 import dataset
 import losses
 import model_GraNet
+import model_SingleUnet
 import utils
 import numpy as np
 import sys
@@ -27,19 +28,29 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     if loss_str == 'mIoU':
         criterion = losses.mIoULoss(n_classes=3, weight=CE_weights).to(device)
 
-    test_num = int(0.1 * l)
+    #Test
+    # 1. SingleUnet + Continnum intensity + 96x96 pix box
+     
+    test_num = int(0.2 * l)
     print("Training set")
-    data_train=dataset.segDataset(file, type='T', channels=channels, l=l-test_num, s=size_boxes, seq_len=seq_len)
+    data_train=dataset.segDataset_SingleUnet(file, type='T', channels=channels, l=l-test_num, s=size_boxes)
     print("Validating set")
-    data_test=dataset.segDataset(file, type='V', channels=channels, l=test_num, s=size_boxes, seq_len=seq_len)
+    data_test=dataset.segDataset_SingleUnet(file, type='V', channels=channels, l=test_num, s=size_boxes)
+
+    #print("Training set")
+    #data_train=dataset.segDataset(file, type='T', channels=channels, l=l-test_num, s=size_boxes, seq_len=seq_len)
+    #print("Validating set")
+    #data_test=dataset.segDataset(file, type='V', channels=channels, l=test_num, s=size_boxes, seq_len=seq_len)
     
-    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=False, num_workers=20, drop_last=True)
-    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=True, num_workers=20, drop_last=True)
+    train_dataloader = torch.utils.data.DataLoader(data_train, batch_size=BACH_SIZE, shuffle=False, num_workers=4, drop_last=True)
+    test_dataloader = torch.utils.data.DataLoader(data_test, batch_size=BACH_SIZE, shuffle=True, num_workers=4, drop_last=True)
     
     n_class = len(data_train.bin_classes)
 
-    model_unet = model_GraNet.GraNet(n_channels=channels, n_classes=n_class, n_seq=(2*seq_len)+1, n_hidden=cfg.n_hidden,
-                h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=bilinear, dropout=dropout).to(device)
+    model_unet = model_SingleUnet.UNet(n_channels=channels, n_classes=n_class, bilinear=bilinear, dropout=dropout).to(device)
+
+    #model_unet = model_GraNet.GraNet(n_channels=channels, n_classes=n_class, n_seq=(2*seq_len)+1, n_hidden=cfg.n_hidden,
+    #            h=cfg.h, w=cfg.w, batch=cfg.batch, bilinear=bilinear, dropout=dropout).to(device)
     
     optimizer = torch.optim.Adam(model_unet.parameters(), lr=lr)
     #Ajust learing rate
@@ -51,8 +62,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
     #Histograms
     save_h_train_losses = []
     save_h_val_losses = []
-    train_xypred = []
-    test_xypred = []
 
     scheduler_counter = 0
 
@@ -84,13 +93,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
                     np.mean(loss_list),
                 )
             )
-            #Evaluation of the training results
-            pred_mask_class = torch.argmax(pred_mask, axis=1)
-            if batch_i % 5:
-                x_p = x.cpu().detach().numpy()
-                y_p = y.cpu().detach().numpy()
-                pred_p = pred_mask_class.cpu().detach().numpy()
-                train_xypred.append([x_p[-1,:,:,:,:], y_p[-1], pred_p[-1]])
 
         scheduler_counter += 1
     
@@ -110,13 +112,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             val_loss = criterion(pred_mask, y.to(device))
             pred_mask_class = torch.argmax(pred_mask, axis=1)
 
-            #Evaluation of the testing results
-            if batch_i % 5:
-                x_p = x.cpu().detach().numpy()
-                y_p = y.cpu().detach().numpy()
-                pred_p = pred_mask_class.cpu().detach().numpy()
-                test_xypred.append([x_p[-1,:,:,:,:], y_p[-1], pred_p[-1]])
-
             val_overall_pa, val_per_class_pa, val_jaccard_index, val_dice_index, pc_opa, pc_j, pc_d = utils.eval_metrics_sem(y.to(device), pred_mask_class.to(device), n_class, device)
             val_overall_pa_list.append(val_overall_pa.cpu().detach().numpy())
             val_per_class_pa_list.append(val_per_class_pa.cpu().detach().numpy())
@@ -124,6 +119,7 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             val_dice_index_list.append(val_dice_index.cpu().detach().numpy())
             val_loss_list.append(val_loss.cpu().detach().numpy())
             val_acc_list.append(utils.acc(y,pred_mask).numpy())
+
     
         print(' Epoch {} - loss : {:.5f} - acc : {:.2f} - val loss : {:.5f} - val acc : {:.2f}'.format(epoch, 
                                                                                                         np.mean(loss_list), 
@@ -165,9 +161,6 @@ def run(file=cfg.file, l=cfg.l, size_boxes=cfg.h, channels=cfg.channels, N_EPOCH
             np.save(f, save_losses)
             np.save(f, save_h_train_losses)
             np.save(f, save_h_val_losses)
-        with open('model_params/Train_results_{}.npy'.format(stdt), 'wb') as f:
-            np.save(f, train_xypred)
-            np.save(f, test_xypred)
         with open('model_params/Train_params_{}.txt'.format(stdt), 'wb') as f:
             for key, value in cfg.items():
                 line = str(key) + " : "+str(value)+"\n"
